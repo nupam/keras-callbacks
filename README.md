@@ -1,5 +1,5 @@
 # keras-callbacks
-## Contains callbacks for cyclic learning rate, recording loss/lr, finding lr
+## Contains callbacks for cyclic learning rate, recording loss/lr/momentum, finding lr
 ### For example usage see example_usage.ipynb
 ### This module is inspired from fastai learner and cyclic learning rate scheduler
 
@@ -48,6 +48,7 @@ keras callback to store training losses, learning rate and momentum (if applicab
 			data: numpy arrays (x, y) or data_generator yeilding mini-batches as such<br>
 			max_epochs: maximum number of epochs run test to<br>
 			steps_per_epoch: number of steps to take per epoch, only uses when generator=True is provided<br>
+			batch_size: batchsize to use in model.fit, not applicable if generator is used<br>
 			alpha: shooting factor(parameter for smoothing loss, use 0 for no smoothing)<br>
 			logloss: plots loss in logarithmic scale<br>
 			clip_loss: clips loss between 2.5 and 97.5 percentile<br>
