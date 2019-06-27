@@ -18,6 +18,8 @@ class RecorderCallback(keras.callbacks.Callback):
     
     def __init__(self, alpha=0.9):
         super(RecorderCallback, self).__init__()
+	assert alpha-K.epsilon() >= 0 and alpha < 1
+	
         self.lr_list, self.loss_list, self.mom_list = [], [], []
         self.alpha = alpha
         
@@ -264,7 +266,7 @@ class LRFindCallback(keras.callbacks.Callback):
         
         
         
-def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, **kwargs):
+def lr_find(model, data, generator=False, batch_size=32, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, **kwargs):
     
     
     """
@@ -272,6 +274,7 @@ def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None,
 		parameters:
 			model: keras model object to test on
 			data: numpy arrays (x, y) or data_generator yeilding mini-batches as such
+			batch_size: batchsize to use in model.fit, not applicable if generator is used
 			max_epochs: maximum number of epochs run test to
 			steps_per_epoch: number of steps to take per epoch, only uses when generator=True is provided
 			alpha: shooting factor(parameter for smoothing loss, use 0 for no smoothing)
@@ -288,7 +291,7 @@ def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None,
     if generator:
         model.fit_generator(data, steps_per_epoch=steps_per_epoch, epochs=max_epochs, callbacks=[lr_cb])
     else:
-        model.fit(data[0], data[1], epochs=max_epochs, callbacks=[lr_cb])
+        model.fit(data[0], data[1], batch_size=batch_size, epochs=max_epochs, callbacks=[lr_cb])
     
     lr, loss = lr_cb.lr_list, lr_cb.loss_list
     for i in range(1, len(lr)):
