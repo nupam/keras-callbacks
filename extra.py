@@ -2,13 +2,14 @@ import keras
 import numpy as np
 from matplotlib import pyplot as plt
 import os
+import keras.backend as K
+import math
 
 class RecorderCallback(keras.callbacks.Callback):
-    def __init__(self, alpha=0.9, clip_loss=False):
+    def __init__(self, alpha=0.9):
         super(RecorderCallback, self).__init__()
         self.lr_list, self.loss_list, self.mom_list = [], [], []
         self.alpha = alpha
-        self.clip_loss = clip_loss
         
     def __clip__(self, x, low=0.025, high=0.975):
         x = np.clip(x, np.quantile(x, low), np.quantile(x, high))
@@ -26,13 +27,13 @@ class RecorderCallback(keras.callbacks.Callback):
         if self.store_mom:
             self.mom_list.append(K.get_value(self.model.optimizer.beta_1))
         
-    def plot_losses(self, log=False):
+    def plot_losses(self, log=False, clip_losses=False):
         y = self.loss_list
         tmp_y = [y[0]]
         for i in range(1, len(y)):
             tmp_y.append(self.alpha*tmp_y[i-1] + (1-self.alpha)*y[i])
         
-        if self.clip_loss:
+        if clip_losses:
             tmp_y = self.__clip__(tmp_y)
             
         if log:
@@ -87,7 +88,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
             raise NotImplementedError('only implemented for Adam optimizer and derivatives\nunable to use with ', self.model.optimizer.__class__.__name__)
         self.verbose = self.verbose if self.verbose is not None else self.params['verbose']
         self.epochs = self.params['epochs']
-        self.steps = self.params['steps']
+        self.steps = self.params['steps'] if self.params['steps'] is not None else math.ceil(self.params['samples'])//self.params['batch_size']
         self.lr_original = float(K.get_value(self.model.optimizer.lr))
         self.max_lr = self.max_lr+K.epsilon() if self.max_lr is not None else float(K.get_value(self.model.optimizer.lr))
         self.steps_per_cycle = (self.steps*self.epochs)//self.cycles
@@ -102,7 +103,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
         step = self.current_batch%self.steps_per_cycle
         
         if step == 0:
-            if self.current_batch//self.steps_per_cycle > 0:
+            if self.current_batch > 0:
                 self.max_lr *= self.decay
             if self.verbose and abs(self.decay-1.0) > K.epsilon() and self.current_batch//self.steps_per_cycle < self.cycles:
                 print('\ncycle:', self.current_batch//self.steps_per_cycle, ', setting lr to:', self.max_lr)
@@ -128,7 +129,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
     
     
 class LRFindCallback(keras.callbacks.Callback):
-    def __init__(self, max_lr=1., min_lr=8e-5, max_epochs=10, multiplier=1.01, max_loss=None):
+    def __init__(self, max_lr=1., min_lr=8e-5, max_epochs=10, multiplier=1.015, max_loss=None):
         super(LRFindCallback, self).__init__()
         assert max_epochs >= 1
         assert max_lr >= 0
@@ -194,7 +195,7 @@ class LRFindCallback(keras.callbacks.Callback):
     def reset(self):
         self.lr_list, self.loss_list = [], []
         
-def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, warmup_steps=100, **kwargs):
+def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, **kwargs):
     lr_cb = LRFindCallback(max_epochs=max_epochs, **kwargs)
     if generator:
         model.fit_generator(data, steps_per_epoch=steps_per_epoch, epochs=max_epochs, callbacks=[lr_cb])
