@@ -18,7 +18,7 @@ class RecorderCallback(keras.callbacks.Callback):
     
     def __init__(self, alpha=0.9):
         super(RecorderCallback, self).__init__()
-	assert alpha-K.epsilon() >= 0 and alpha < 1
+        assert alpha-K.epsilon() >= 0 and alpha < 1
 	
         self.lr_list, self.loss_list, self.mom_list = [], [], []
         self.alpha = alpha
