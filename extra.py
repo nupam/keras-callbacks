@@ -6,6 +6,16 @@ import keras.backend as K
 import math
 
 class RecorderCallback(keras.callbacks.Callback):
+    
+    """
+    parameters:
+        alpha: float, smoothness factor, weight for exponetially weighted average to smooth loss
+    	alpha must be bwtween [0,1)
+    	for no smoothing us alpha=0
+
+    keras callback to store training losses, learning rate and momentum (if applicable) during training of any model
+    """
+    
     def __init__(self, alpha=0.9):
         super(RecorderCallback, self).__init__()
         self.lr_list, self.loss_list, self.mom_list = [], [], []
@@ -28,6 +38,14 @@ class RecorderCallback(keras.callbacks.Callback):
             self.mom_list.append(K.get_value(self.model.optimizer.beta_1))
         
     def plot_losses(self, log=False, clip_losses=False):
+        
+        """
+    	plots losses
+    	parameters:
+			log:  boolean, logscale for loss, pass parameter log=True
+			clip_losses: boolean, to clip losses between 2.5 and 97.5 percentile, pass parameter clip_losses=True
+    	"""
+        
         y = self.loss_list
         tmp_y = [y[0]]
         for i in range(1, len(y)):
@@ -45,6 +63,9 @@ class RecorderCallback(keras.callbacks.Callback):
         plt.show()
         
     def plot_lr(self):
+        """
+        plots learning rate w.r.t steps(batches)
+        """
         plt.xlabel('steps')
         plt.ylabel('lr')
         x = self.lr_list
@@ -52,6 +73,9 @@ class RecorderCallback(keras.callbacks.Callback):
         plt.show()
         
     def plot_mom(self):
+        """
+        plots momentum (if applicable) w.r.t steps(batches)
+        """
         if not self.store_mom:
             raise NotImplementedError('only implemented for Adam optimizer and derivatives\nunable to use with ', self.model.optimizer.__class__.__name__)
         plt.xlabel('steps')
@@ -64,6 +88,26 @@ class RecorderCallback(keras.callbacks.Callback):
         self.lr_list, self.loss_list = [], []
         
 class CyclicLRCallback(keras.callbacks.Callback):
+    
+    """
+	Warning: This callback is implemented for Adam family of optimizers, i.e, Adam, Adamax, Nadam, with parameter beta_1 as momentum
+	
+	parameters:
+		max_lr: maximum value of learning rate, if not provided fetched from optimizer
+		min_lr: minimum value of learning rate
+		cycles: number of cycles to repeat of CLR
+		pct_start: ratio of cycle to increase the learning rate from min_lr to max_lr, remaining to decrease
+		moms: momentum range to be used
+		decay: decay value of max_lr after each cycle, max_lr after each cycle becomes max_lr*decay
+			it is possible to use decay > 1, no warning will be issued
+
+	keras callback for cyclic learning rate, for more details on working see original paper: https://arxiv.org/abs/1506.01186
+	Learning rate is linearly increased to max_lr from zero in pct_start (start percentage-[0,1]) part of cycle then decreases to zero as cosine dunction in (1-pct_start) part of cycle.
+	This is repeated as number of cycles.
+	In similar manner momentum is decresed from moms[0] to moms[1]
+
+	"""
+    
     def __init__(self, max_lr=None, min_lr=K.epsilon(), cycles=1, pct_start = 0.3, moms=(0.95, 0.85), decay=1.0, verbose=None):
         super(CyclicLRCallback, self).__init__()
         assert cycles > 0
@@ -93,6 +137,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
         self.max_lr = self.max_lr+K.epsilon() if self.max_lr is not None else float(K.get_value(self.model.optimizer.lr))
         self.steps_per_cycle = (self.steps*self.epochs)//self.cycles
         self.current_batch = 0
+        self.beta_1_original =  float(K.get_value(self.model.optimizer.beta_1))
         
         if self.verbose: 
             print('epochs:', self.epochs, ', steps per cycle:', self.steps_per_cycle, ', total steps:',
@@ -102,6 +147,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
         pct_start = self.pct_start
         step = self.current_batch%self.steps_per_cycle
         
+        ##decay max_lr
         if step == 0:
             if self.current_batch > 0:
                 self.max_lr *= self.decay
@@ -119,16 +165,36 @@ class CyclicLRCallback(keras.callbacks.Callback):
         lr_now = (increasing_lr*up + (not increasing_lr)*down)*self.max_lr
         curr_mom = self.moms[0] - increasing_lr*up*moms_diff - (not increasing_lr)*down*moms_diff
         
+        
+        ## update parameters, i.e, learning rate and momentum of optimizer
         K.set_value(self.model.optimizer.lr, lr_now)
         K.set_value(self.model.optimizer.beta_1, curr_mom)
-        #print('lr_now', lr_now)
+
         self.current_batch += 1
         
     def on_train_end(self, logs=None):
+        """
+        reset optimizer learning rate and momentum
+        """
+        K.set_value(self.model.optimizer.beta_1, self.beta_1_original)
         K.set_value(self.model.optimizer.lr, self.lr_original)
     
     
 class LRFindCallback(keras.callbacks.Callback):
+    
+    """
+	parameters:
+		max_lr: float, maximum value of learning rate to test on
+		min_lr: float, manimum value of learning rate to test on
+		max_epochs: integer, maximum number of epochs to run test upto
+		multiplier: float, ratio to increase learning rate from previous step
+		max_loss: float, maximum loss of model till which learning could be increased
+
+	keras callback which gradually increases leraning rate from min_lr to max_lr and records loss at each step
+	Stores learning rate nad respective loss in python lists lr_list, loss_list respectively
+	Uses disk to write temporary model weights, read write permission and enough disk space is required
+	"""
+    
     def __init__(self, max_lr=1., min_lr=8e-5, max_epochs=10, multiplier=1.015, max_loss=None):
         super(LRFindCallback, self).__init__()
         assert max_epochs >= 1
@@ -195,7 +261,29 @@ class LRFindCallback(keras.callbacks.Callback):
     def reset(self):
         self.lr_list, self.loss_list = [], []
         
+        
+        
+        
 def lr_find(model, data, generator=False, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, **kwargs):
+    
+    
+    """
+		uses LRFindCallback defined above to plot lr vs loss graph
+		parameters:
+			model: keras model object to test on
+			data: numpy arrays (x, y) or data_generator yeilding mini-batches as such
+			max_epochs: maximum number of epochs run test to
+			steps_per_epoch: number of steps to take per epoch, only uses when generator=True is provided
+			alpha: shooting factor(parameter for smoothing loss, use 0 for no smoothing)
+			logloss: plots loss in logarithmic scale
+			clip_loss: clips loss between 2.5 and 97.5 percentile
+			max_lr: maximum value of learning rate to test on
+			min_lr: manimum value of learning rate to test on
+			multiplier: ratio to increase learning rate from previous step
+			max_loss: maximum loss of model till which learning could be increased
+
+	"""
+    
     lr_cb = LRFindCallback(max_epochs=max_epochs, **kwargs)
     if generator:
         model.fit_generator(data, steps_per_epoch=steps_per_epoch, epochs=max_epochs, callbacks=[lr_cb])
