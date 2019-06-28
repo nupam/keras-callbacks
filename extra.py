@@ -110,7 +110,9 @@ class CyclicLRCallback(keras.callbacks.Callback):
 
 	"""
     
-    def __init__(self, max_lr=None, min_lr=K.epsilon(), cycles=1, pct_start = 0.3, moms=(0.95, 0.85), decay=1.0, verbose=None):
+    def __init__(self, max_lr=None, min_lr=K.epsilon(), cycles=1, pct_start = 0.3, 
+                 moms=(0.95, 0.85), decay=1.0, verbose=None, 
+                 auto_decay=False, monitor='val_loss', patience=1, min_delta=0.0001, cooldown=0):
         super(CyclicLRCallback, self).__init__()
         assert cycles > 0
         assert max_lr is None or max_lr >= 0
@@ -129,17 +131,37 @@ class CyclicLRCallback(keras.callbacks.Callback):
         self.verbose = verbose
         
         
+        self.auto_decay = auto_decay
+        self.patience=patience
+        self.monitor = monitor
+        self.min_delta = min_delta
+        self.monitor_op = lambda a, b: np.less(a, b - self.min_delta)
+        self.cooldown = cooldown
+        self.cooldown_counter = 0  # Cooldown counter.
+        self.wait = 0
+        self.best_monitor = np.inf
+        
+        
+        
     def on_train_begin(self, logs=None):
         if self.model.optimizer.__class__.__name__ not in ('Adam', 'Nadam', 'Adamax'):
             raise NotImplementedError('only implemented for Adam optimizer and derivatives\nunable to use with ', self.model.optimizer.__class__.__name__)
         self.verbose = self.verbose if self.verbose is not None else self.params['verbose']
         self.epochs = self.params['epochs']
         self.steps = self.params['steps'] if self.params['steps'] is not None else math.ceil(self.params['samples'])//self.params['batch_size']
+        
         self.lr_original = float(K.get_value(self.model.optimizer.lr))
+        self.beta_1_original =  float(K.get_value(self.model.optimizer.beta_1))
+        
         self.max_lr = self.max_lr+K.epsilon() if self.max_lr is not None else float(K.get_value(self.model.optimizer.lr))
         self.steps_per_cycle = (self.steps*self.epochs)//self.cycles
+        
+        self.curr_cycle = -1
         self.current_batch = 0
-        self.beta_1_original =  float(K.get_value(self.model.optimizer.beta_1))
+        self.epochs_per_cycle = self.epochs//self.cycles
+        
+        if self.auto_decay:
+            assert self.epochs%self.cycles == 0
         
         if self.verbose: 
             print('epochs:', self.epochs, ', steps per cycle:', self.steps_per_cycle, ', total steps:',
@@ -151,9 +173,12 @@ class CyclicLRCallback(keras.callbacks.Callback):
         
         ##decay max_lr
         if step == 0:
+            self.curr_cycle += 1
+            
+        if step == 0 and (abs(self.decay-1.0) > K.epsilon()) and not self.auto_decay:
             if self.current_batch > 0:
                 self.max_lr *= self.decay
-            if self.verbose and abs(self.decay-1.0) > K.epsilon() and self.current_batch//self.steps_per_cycle < self.cycles:
+            if self.verbose and self.current_batch//self.steps_per_cycle < self.cycles:
                 print('\ncycle:', self.current_batch//self.steps_per_cycle, ', setting lr to:', self.max_lr)
             
             
@@ -174,12 +199,54 @@ class CyclicLRCallback(keras.callbacks.Callback):
 
         self.current_batch += 1
         
+        
+    def on_epoch_end(self, epoch, logs=None):
+        
+        if self.auto_decay:
+            print('check, epoch ', epoch, 'curr_cycle: ', self.curr_cycle, 'best: ', self.best_monitor)
+            logs = logs or {}
+            logs['lr'] = self.max_lr
+            current = logs.get(self.monitor)
+            if current is None:
+                warnings.warn(
+                    'Reduce LR on plateau conditioned on metric `%s` '
+                    'which is not available. Available metrics are: %s' %
+                    (self.monitor, ','.join(list(logs.keys()))), RuntimeWarning
+                )
+
+            elif epoch % self.epochs_per_cycle:
+                if self.in_cooldown():
+                    self.cooldown_counter -= 1
+                    self.wait = 0
+
+                if self.monitor_op(current, self.best_monitor):
+                    self.best_monitor = current
+                    self.wait = 0
+                elif not self.in_cooldown():
+                    self.wait += 1
+                    if self.wait >= self.patience:
+                        old_lr = self.max_lr
+                        if old_lr > self.min_lr:
+                            new_lr = old_lr * self.decay
+                            new_lr = max(new_lr, self.min_lr)
+                            self.max_lr = new_lr
+                            if self.verbose > 0:
+                                print('\nEpoch %05d: ReduceLROnPlateau reducing '
+                                      'learning rate to %s.' % (epoch + 1, new_lr))
+                                print(self.monitor, 'did not improve from', self.best_monitor)
+                            self.cooldown_counter = self.cooldown
+                            self.wait = 0
+    
     def on_train_end(self, logs=None):
         """
         reset optimizer learning rate and momentum
         """
         K.set_value(self.model.optimizer.beta_1, self.beta_1_original)
         K.set_value(self.model.optimizer.lr, self.lr_original)
+        
+    def in_cooldown(self):
+        return self.cooldown_counter > 0
+
     
     
 class LRFindCallback(keras.callbacks.Callback):
