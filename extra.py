@@ -1,3 +1,8 @@
+### Author: Anupam Kumar
+### email: nupam@outlook.in
+### Github repo: https://github.com/nupam/keras-callbacks
+### License: MIT
+
 import keras
 import numpy as np
 from matplotlib import pyplot as plt
