@@ -246,7 +246,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
                             new_lr = max(new_lr, self.min_lr)
                             self.max_lr = new_lr
                             if self.verbose:
-                                print('\ncycle %05d: ReduceLROnPlateau reducing '
+                                print('\ncycle %05d: Reducing '
                                       'learning rate to %s.' % (self.curr_cycle, new_lr))
                                 print(self.monitor, 'did not improve from', self.best_monitor)
                             self.cooldown_counter = self.cooldown
