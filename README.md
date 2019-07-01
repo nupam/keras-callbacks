@@ -15,7 +15,8 @@ keras callback to store training losses, learning rate and momentum (if applicab
 
  2. CyclicLRCallback:<br>
 	  Warning: This callback is implemented for Adam family of optimizers, i.e, Adam, Adamax, Nadam, with parameter beta_1 as momentum<br>
-    keras callback for cyclic learning rate.<br>For more details on working see original paper: https://arxiv.org/abs/1506.01186
+    keras callback for cyclic learning rate.<br>For more details on working see original paper: https://arxiv.org/abs/1506.01186<br>
+    This callback also features auto decay option that will decay learning rate after patience cycles if no improvement in monitored metric/loss is observed, In such case epochs must be multiple of cycles.<br>
 	<br>Learning rate is linearly increased to max_lr from zero in pct_start (start percentage-[0,1]) part of cycle then decreases to zero as cosine function in (1-pct_start) part of cycle.
 	<br>This is repeated as number of cycles.
 	<br>In similar manner momentum is decresed from moms[0] to moms[1]<br>
@@ -23,6 +24,9 @@ keras callback to store training losses, learning rate and momentum (if applicab
     > max_lr: maximum value of learning rate, if not provided fetched from optimizer<br>
 		min_lr: minimum value of learning rate<br>
 		cycles: number of cycles to repeat of CLR<br>
+		auto_decay: set True to decay lr automatically at end of cycle<br>
+		patience: number of cycles to wait before decaying lr<br>
+		monitor: monitered metric/loss for auto decay<br>
 		pct_start: ratio of cycle to increase the learning rate from min_lr to max_lr, remaining to decrease<br>
 		moms: momentum range to be used<br>
 		decay: decay value of max_lr after each cycle, max_lr after each cycle becomes max_lr\*decay<br> it is possible to use decay > 1, no warning will be issued<br>
