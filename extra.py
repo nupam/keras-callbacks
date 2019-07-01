@@ -380,7 +380,7 @@ def lr_find(model, data, generator=False, batch_size=32, max_epochs = 10, steps_
         loss[i] = alpha*loss[i-1] + (1-alpha)*loss[i]
         
     if clip_loss:
-         loss = np.clip(loss, np.quantile(loss, 0.5), np.quantile(loss, 0.95))
+         loss = np.clip(loss, np.quantile(loss, 0.025), np.quantile(loss, 0.975))
     
     plt.xlabel('lr')
     plt.ylabel('loss')
