@@ -1,6 +1,6 @@
 # keras-callbacks
 ## Contains callbacks for cyclic learning rate, recording loss/lr/momentum, finding lr
-### For example usage see example_usage.ipynb
+### For example usage see example_usage.ipynb(crazy high lr is to exaggerate decay)
 ### This module is inspired from fastai learner and cyclic learning rate scheduler
 
 This module is tested on keras 2.2.4 with tensorflow backend<br><br>
@@ -14,7 +14,7 @@ keras callback to store training losses, learning rate and momentum (if applicab
     	  for no smoothing us alpha=0<br>
 
  2. CyclicLRCallback:<br>
-	  Warning: This callback is implemented for Adam family of optimizers, i.e, Adam, Adamax, Nadam, with parameter beta_1 as momentum<br>
+	  Warning: This callback is only implemented for Adam family of optimizers, i.e, Adam, Adamax, Nadam, with parameter beta_1 as momentum<br>
     keras callback for cyclic learning rate.<br>For more details on working see original paper: https://arxiv.org/abs/1506.01186<br>
     This callback also features auto decay option that will decay learning rate after patience cycles if no improvement in monitored metric/loss is observed, In such case epochs must be multiple of cycles.<br>
 	<br>Learning rate is linearly increased to max_lr from zero in pct_start (start percentage-[0,1]) part of cycle then decreases to zero as cosine function in (1-pct_start) part of cycle.
