@@ -45,13 +45,13 @@ class RecorderCallback(keras.callbacks.Callback):
         if self.store_mom:
             self.mom_list.append(K.get_value(self.model.optimizer.beta_1))
         
-    def plot_losses(self, log=False, clip_losses=False):
+    def plot_losses(self, log=False, clip=False):
         
         """
     	plots losses
     	parameters:
 			log:  boolean, logscale for loss, pass parameter log=True
-			clip_losses: boolean, to clip losses between 2.5 and 97.5 percentile, pass parameter clip_losses=True
+			clip: boolean, to clip losses between 2.5 and 97.5 percentile, pass parameter clip_losses=True
     	"""
         
         y = self.loss_list
@@ -59,7 +59,7 @@ class RecorderCallback(keras.callbacks.Callback):
         for i in range(1, len(y)):
             tmp_y.append(self.alpha*tmp_y[i-1] + (1-self.alpha)*y[i])
         
-        if clip_losses:
+        if clip:
             tmp_y = self.__clip__(tmp_y)
             
         if log:
@@ -132,7 +132,13 @@ class CyclicLRCallback(keras.callbacks.Callback):
         self.max_lr = max_lr
         self.moms = moms
         self.decay = decay
-        self.pct_start = pct_start+K.epsilon()
+        
+        self.pct_start = pct_start ## avoid division by zero
+        if (1.-self.pct_start) < K.epsilon():
+            self.pct_start -= K.epsilon()
+        elif self.pct_start < K.epsilon():
+            self.pct_start += K.epsilon()
+            
         self.current_batch = 0
         self.verbose = verbose
         self.DEBUG_MODE = DEBUG_MODE
@@ -147,8 +153,6 @@ class CyclicLRCallback(keras.callbacks.Callback):
         self.cooldown_counter = 0  # Cooldown counter.
         self.wait = 0
         self.best_monitor = np.inf
-        
-        self.debug_counter = 0
         
         
         
@@ -178,10 +182,8 @@ class CyclicLRCallback(keras.callbacks.Callback):
             
         
     def on_batch_begin(self, batch, logs=None):
-        pct_start = self.pct_start
         step = self.current_batch%self.steps_per_cycle
         ##decay max_lr
-        self.debug_counter += 1
         if step == 0:
             self.curr_cycle += 1
             if self.curr_cycle > self.cycles:
@@ -189,24 +191,23 @@ class CyclicLRCallback(keras.callbacks.Callback):
                 self.model.stop_training = True
             if self.verbose:
                 if self.verbose: print('\ncycle no.: ', self.curr_cycle)
-                self.debug_counter = 0
             
-        if step == 0 and (abs(self.decay-1.0) > K.epsilon()) and not self.auto_decay:
-            if self.current_batch > 0:
-                self.max_lr *= self.decay
-            if self.verbose and self.current_batch//self.steps_per_cycle < self.cycles:
-                print('\ncycle:', self.current_batch//self.steps_per_cycle, ', setting lr to:', self.max_lr)
-            
-            
+            if abs(self.decay-1.0) > K.epsilon() and not self.auto_decay:
+                if self.current_batch > 0:
+                    self.max_lr *= self.decay
+                if self.verbose and self.current_batch//self.steps_per_cycle < self.cycles:
+                    print('\ncycle:', self.current_batch//self.steps_per_cycle, ', setting lr to:', self.max_lr)
+
+
         pct_now = step/self.steps_per_cycle
-        increasing_lr =  pct_now <= pct_start
+        increasing_lr =  pct_now <= self.pct_start
         
-        up = pct_now/pct_start
-        down = np.cos((pct_now-pct_start)/(1.-pct_start+K.epsilon()) *np.pi/2.)
+        up = pct_now/self.pct_start
+        down = (np.cos((pct_now-self.pct_start)/(1.-self.pct_start) *np.pi) + 1)/2
         moms_diff = self.moms[0] - self.moms[1]
         
         lr_now = (increasing_lr*up + (not increasing_lr)*down)*self.max_lr
-        curr_mom = self.moms[0] - increasing_lr*up*moms_diff - (not increasing_lr)*down*moms_diff
+        curr_mom = self.moms[0] - (increasing_lr*up + (not increasing_lr)*down)*moms_diff
         
         
         ## update parameters, i.e, learning rate and momentum of optimizer
@@ -223,7 +224,6 @@ class CyclicLRCallback(keras.callbacks.Callback):
         if self.DEBUG_MODE: print('\nat epoch', epoch+1, 'end, batch num: ', self.current_batch)
         
         if self.auto_decay:
-            if self.DEBUG_MODE: print('check at epoch end, epoch ', epoch+1, 'curr_cycle: ', self.curr_cycle, 'best: ', self.best_monitor)
             logs = logs or {}
             logs['lr'] = self.max_lr
             current = logs.get(self.monitor)
@@ -256,6 +256,8 @@ class CyclicLRCallback(keras.callbacks.Callback):
                                 print(self.monitor, 'did not improve from', self.best_monitor)
                             self.cooldown_counter = self.cooldown
                             self.wait = 0
+            if self.DEBUG_MODE:
+                print('check at epoch end, epoch ', epoch+1, 'curr_cycle: ', self.curr_cycle, 'best: ', self.best_monitor)
     
     def on_train_end(self, logs=None):
         """
@@ -353,7 +355,7 @@ class LRFindCallback(keras.callbacks.Callback):
         
         
         
-def lr_find(model, data, generator=False, batch_size=32, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=True, clip_loss=False, **kwargs):
+def lr_find(model, data, generator=False, batch_size=32, max_epochs = 10, steps_per_epoch=None, alpha=0.9, logloss=False, clip_loss=False, **kwargs):
     
     
     """
