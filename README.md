@@ -60,3 +60,5 @@ keras callback to store training losses, learning rate and momentum (if applicab
 			min_lr: manimum value of learning rate to test on<br>
 			multiplier: ratio to increase learning rate from previous step<br>
 			max_loss: maximum loss of model till which learning could be increased<br>
+
+It was a great learning experiecne <3
