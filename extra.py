@@ -8,6 +8,7 @@
 ##TODO: 2. add pause/resume and training failure tolerance
 ##TODO: 3. distributed training
 ##TODO: 4. add tests for backends and update auto CI/CD
+##TODO: 5. export state/control to syslog-forwarding/https-flask-app (can use sagemaker/gcp)
 
 import keras
 import numpy as np
