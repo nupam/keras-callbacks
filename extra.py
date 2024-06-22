@@ -1,7 +1,10 @@
 ### Author: Anupam Kumar
 ### email: nupam@outlook.in
 ### Github repo: https://github.com/nupam/keras-callbacks
-### License: MIT
+### License: MIT ## I thinks it means do as you please at only your complete accord on no explicit or implied warranty/gurrantee at included licence.
+### 	## I implementedd these as part of learing stuff.
+
+##TODO: make mixed precision a transparent toggle
 
 import keras
 import numpy as np
@@ -113,7 +116,6 @@ class CyclicLRCallback(keras.callbacks.Callback):
 	Learning rate is linearly increased to max_lr from zero in pct_start (start percentage-[0,1]) part of cycle then decreases to zero as cosine dunction in (1-pct_start) part of cycle.
 	This is repeated as number of cycles.
 	In similar manner momentum is decresed from moms[0] to moms[1]
-
 	"""
     
     def __init__(self, max_lr=None, min_lr=K.epsilon(), cycles=1, pct_start = 0.3, 
@@ -126,6 +128,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
         assert pct_start >= 0 and pct_start <= 1.0
         assert len(moms)==2 and moms[0] >= 0.0 and moms[0] <= 1.0 and moms[1] >= 0.0 and moms[1] <= 1.0
         assert decay > 0 ## it is possible to use decay > 1, no warning will be issued
+			 #??can one use >1 momentum for verification tasks, as we decay lr??
         
         self.cycles = cycles
         self.min_lr = min_lr+K.epsilon()
@@ -173,7 +176,7 @@ class CyclicLRCallback(keras.callbacks.Callback):
         self.current_batch = 0
         self.epochs_per_cycle = self.epochs//self.cycles
         
-        if self.auto_decay:  ##validatation info only available ate epoch end
+        if self.auto_decay:  ##validatation info only available at an epoch end
             assert self.epochs%self.cycles == 0
         
         if self.verbose: 
