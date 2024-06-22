@@ -4,7 +4,10 @@
 ### License: MIT ## I thinks it means do as you please at only your complete accord on no explicit or implied warranty/gurrantee at included licence.
 ### 	## I implementedd these as part of learing stuff.
 
-##TODO: make mixed precision a transparent toggle
+##TODO: 1. make mixed precision a transparent toggle
+##TODO: 2. add pause/resume and training failure tolerance
+##TODO: 3. distributed training
+##TODO: 4. add tests for backends and update auto CI/CD
 
 import keras
 import numpy as np
