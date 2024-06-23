@@ -1,7 +1,7 @@
 # keras-callbacks
 ## Contains callbacks for cyclic learning rate, recording loss/lr/momentum, finding lr
 ### For example usage see example_usage.ipynb(crazy high lr is to exaggerate decay)
-### This module is inspired from fastai learner and cyclic learning rate scheduler
+### This module is inspired from fastaiv1 learner and cyclic learning rate scheduler
 
 This module is tested on keras 2.2.4 with tensorflow backend<br><br>
 Callbacks and functions defined:
